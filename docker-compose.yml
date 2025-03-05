@@ -1,0 +1,117 @@
+services:
+  sonarqube:
+    image: sonarqube:community
+    hostname: sonarqube
+    container_name: sonarqube
+    read_only: true
+    depends_on:
+      db-sonar:
+        condition: service_healthy
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://db:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonar
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_temp:/opt/sonarqube/temp
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 1G      
+    ports:
+      - "9000:9000"
+    networks:
+      - ipv4
+  db-sonar:
+    image: postgres:17
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    hostname: db-sonar
+    container_name: db-sonar
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+      POSTGRES_DB: sonar
+      #POSTGRES_MULTIPLE_DATABASES: sonar, nexus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 1G         
+    volumes:
+      - db-sonar:/var/lib/postgresql
+      - db-sonar_data:/var/lib/postgresql/data
+      #- ./init.d/multiple-databases.sh:/docker-entrypoint-initdb.d/multiple-databases.sh
+    networks:
+      - ipv4
+  nexus:
+    image: sonatype/nexus3
+    volumes:
+      - "nexus-data:/nexus-data"
+    ports:
+      - "8081:8081"
+    depends_on:
+      db-nexus:
+        condition: service_healthy    
+    environment:
+      - NEXUS_DATASTORE_NEXUS_JDBCURL=jdbc:postgresql://db:5432/nexus
+      - NEXUS_DATASTORE_NEXUS_USERNAME=nexus
+      - NEXUS_DATASTORE_NEXUS_PASSWORD=nexus
+    networks:
+      - ipv4
+  db-nexus:
+    image: postgres:17
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    hostname: db-nexus
+    container_name: db-nexus
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: nexus
+      POSTGRES_DB: nexus
+      #POSTGRES_MULTIPLE_DATABASES: sonar, nexus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 1G         
+    volumes:
+      - db-nexus:/var/lib/postgresql
+      - db-nexus_data:/var/lib/postgresql/data
+      #- ./init.d/multiple-databases.sh:/docker-entrypoint-initdb.d/multiple-databases.sh
+    networks:
+      - ipv4      
+ 
+volumes:
+  sonarqube_data:
+  sonarqube_temp:
+  sonarqube_extensions:
+  sonarqube_logs:
+  db-nexus:
+  db-nexus_data:
+  db-sonar:
+  db-sonar_data:  
+  nexus-data:
+
+networks:
+  ipv4:
+    driver: bridge
+    enable_ipv6: false
